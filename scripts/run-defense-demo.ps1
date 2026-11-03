@@ -152,12 +152,15 @@ Write-Host 'Magic numbers found: MF-Erdeneuul and DB-Erdeneuul.' -ForegroundColo
 $deletedStatus = Get-HttpStatus DELETE "$baseUrl/api/signatures/$($signature.id)" $null $adminToken
 $fullAfterDelete = Invoke-JsonApi GET '/api/signatures' $null $userToken
 $increment = Invoke-JsonApi GET '/api/signatures/increment?since=2000-01-01T00:00:00Z' $null $userToken
+$historyAfterDelete = Invoke-JsonApi GET "/api/signatures/$($signature.id)/history" $null $adminToken
+$auditAfterDelete = Invoke-JsonApi GET "/api/signatures/$($signature.id)/audit" $null $adminToken
 $deletedInFull = @($fullAfterDelete | Where-Object id -eq $signature.id).Count
 $deletedInIncrement = @($increment | Where-Object { $_.id -eq $signature.id -and $_.status -eq 'DELETED' }).Count
-if ($deletedStatus -ne 204 -or $deletedInFull -ne 0 -or $deletedInIncrement -ne 1) {
+if ($deletedStatus -ne 204 -or $deletedInFull -ne 0 -or $deletedInIncrement -ne 1 -or
+    $historyAfterDelete.Count -lt 2 -or $auditAfterDelete.Count -lt 3) {
     throw 'Logical delete/full/increment behavior check failed.'
 }
-Write-Host 'Delete is logical: absent from full export and present as DELETED in increment.' -ForegroundColor Green
+Write-Host 'Delete is logical: absent from full, present in increment, History and Audit.' -ForegroundColor Green
 
 Show-Step '6. Private MinIO, upload and pre-signed URL'
 $sampleFile = Get-Item -LiteralPath (Join-Path (Split-Path -Parent $PSScriptRoot) 'demo/sample.txt')

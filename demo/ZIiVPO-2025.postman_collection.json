@@ -500,7 +500,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Signature created and signed', () => { pm.response.to.have.status(201); const j=pm.response.json(); pm.expect(j.digitalSignatureBase64).to.be.a('string').and.not.empty; });",
-                  "const j=pm.response.json(); pm.collectionVariables.set('signatureId',j.id);"
+                  "const j=pm.response.json(); pm.collectionVariables.set('signatureId',j.id); pm.collectionVariables.set('createdDigitalSignature',j.digitalSignatureBase64);"
                 ]
               }
             }
@@ -538,7 +538,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Signature updated and signed', () => { pm.response.to.have.status(200); const j=pm.response.json(); pm.expect(j.threatName).to.eql('Demo.Trojan.Updated'); pm.expect(j.digitalSignatureBase64).not.empty; });"
+                  "pm.test('Signature updated and re-signed', () => { pm.response.to.have.status(200); const j=pm.response.json(); pm.expect(j.threatName).to.eql('Demo.Trojan.Updated'); pm.expect(j.digitalSignatureBase64).not.empty; pm.expect(j.digitalSignatureBase64).not.to.eql(pm.collectionVariables.get('createdDigitalSignature')); });"
                 ]
               }
             }
@@ -759,7 +759,57 @@
           ]
         },
         {
-          "name": "11 Binary increment",
+          "name": "11 History after delete",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/signatures/{{signatureId}}/history"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Update and delete are in History', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().length).to.be.at.least(2); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 Audit after delete",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/signatures/{{signatureId}}/audit"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Create, update and delete are in Audit', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().length).to.be.at.least(3); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13 Binary increment",
           "request": {
             "method": "GET",
             "header": [
