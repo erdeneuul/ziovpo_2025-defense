@@ -1,0 +1,964 @@
+{
+  "info": {
+    "_postman_id": "4c9f83f2-8cce-4f19-b125-202511030001",
+    "name": "ZIiVPO 2025 - Defense Demo",
+    "description": "Run requests from top to bottom. Tests save JWT tokens and created IDs automatically.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1 - JWT and roles",
+      "item": [
+        {
+          "name": "01 Login ADMIN",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"AdminDemo1!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set('adminAccessToken', j.accessToken);",
+                  "pm.collectionVariables.set('adminRefreshToken', j.refreshToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Who am I (ROLE_ADMIN)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ADMIN role is visible', () => { pm.response.to.have.status(200); pm.expect(pm.response.text()).to.include('ROLE_ADMIN'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 Refresh token pair",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/refresh",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{adminRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Refresh succeeded', () => pm.response.to.have.status(200));",
+                  "const oldToken = pm.collectionVariables.get('adminRefreshToken');",
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set('usedRefreshToken', oldToken);",
+                  "pm.collectionVariables.set('adminAccessToken', j.accessToken);",
+                  "pm.collectionVariables.set('adminRefreshToken', j.refreshToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 Replay old refresh -> 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/refresh",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{usedRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Old refresh is rejected', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 Register USER",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"student\",\n  \"password\": \"Student1!\",\n  \"role\": \"ROLE_ADMIN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('USER created or already exists', () => pm.expect([200,400]).to.include(pm.response.code));",
+                  "pm.test('Public registration cannot grant ADMIN', () => { if (pm.response.code === 200) pm.expect(pm.response.text()).to.include('ROLE_USER'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 Login USER",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"student\",\n  \"password\": \"Student1!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('USER login succeeded', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json(); pm.collectionVariables.set('userAccessToken', j.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 USER blocked from admin URL -> 403",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userAccessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/admin/signatures/files/presigned-urls"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('USER has no ADMIN access', () => pm.expect([403,405]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2-3 - Licenses and EDS",
+      "item": [
+        {
+          "name": "01 Create license type",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/license-types",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Demo 30 days\",\n  \"defaultDurationInDays\": 30,\n  \"description\": \"Defense demonstration\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('License type created', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('licenseTypeId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Create product",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/products",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"ZIiVPO Antivirus\",\n  \"isBlocked\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Product created', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('productId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 Create license",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/license/create",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"typeId\": \"{{licenseTypeId}}\",\n  \"ownerId\": \"{{ownerId}}\",\n  \"deviceCount\": 2,\n  \"description\": \"License for commission demo\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('License created', () => pm.response.to.have.status(200));",
+                  "const j=pm.response.json(); pm.collectionVariables.set('licenseId',j.id); pm.collectionVariables.set('licenseCode',j.code);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 Activate license as USER",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/license/activate",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{licenseCode}}\",\n  \"deviceId\": \"{{deviceId}}\",\n  \"deviceName\": \"Commission laptop\",\n  \"macAddress\": \"00-11-22-33-44-55\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Ticket and EDS returned', () => { pm.response.to.have.status(200); const j=pm.response.json(); pm.expect(j.ticket).to.be.an('object'); pm.expect(j.digitalSignature).to.be.a('string').and.not.empty; });",
+                  "pm.test('All Ticket fields exist', () => { const t=pm.response.json().ticket; ['serverDate','ticketLifetime','activationDate','expirationDate','userId','deviceId','isBlocked'].forEach(k=>pm.expect(t).to.have.property(k)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 Check license",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/license/check?code={{licenseCode}}&deviceId={{deviceId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('License check returns signed Ticket', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().digitalSignature).not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 Renew license",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/license/renew/{{licenseId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('License renewed', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4-5 - Signatures and binary API",
+      "item": [
+        {
+          "name": "01 Create signature",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/signatures",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"threatName\": \"Demo.Trojan\",\n  \"firstBytesHex\": \"4d5a900003000000\",\n  \"remainderHashHex\": \"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\n  \"remainderLength\": 1024,\n  \"fileType\": \"exe\",\n  \"offsetStart\": 0,\n  \"offsetEnd\": 1031\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Signature created and signed', () => { pm.response.to.have.status(201); const j=pm.response.json(); pm.expect(j.digitalSignatureBase64).to.be.a('string').and.not.empty; });",
+                  "const j=pm.response.json(); pm.collectionVariables.set('signatureId',j.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Update signature",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/signatures/{{signatureId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"threatName\": \"Demo.Trojan.Updated\",\n  \"firstBytesHex\": \"4d5a900003000000\",\n  \"remainderHashHex\": \"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\n  \"remainderLength\": 2048,\n  \"fileType\": \"exe\",\n  \"offsetStart\": 0,\n  \"offsetEnd\": 2055\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Signature updated and signed', () => { pm.response.to.have.status(200); const j=pm.response.json(); pm.expect(j.threatName).to.eql('Demo.Trojan.Updated'); pm.expect(j.digitalSignatureBase64).not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/signatures/{{signatureId}}/history"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('History contains previous version', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().length).to.be.above(0); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 Audit",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/signatures/{{signatureId}}/audit"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Audit contains operations', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().length).to.be.above(0); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 Get by IDs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/signatures/by-ids",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": [\n    \"{{signatureId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Selection by IDs works', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().length).to.eql(1); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 Full JSON export",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/signatures"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ACTUAL signature appears in full export', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().some(x=>x.id===pm.collectionVariables.get('signatureId'))).to.be.true; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 Binary full: multipart + magic numbers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/binary/signatures/full"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('multipart/mixed response', () => { pm.response.to.have.status(200); pm.expect(pm.response.headers.get('Content-Type')).to.include('multipart/mixed'); });",
+                  "pm.test('Both magic numbers are visible', () => { const text=pm.response.text(); pm.expect(text).to.include('MF-Erdeneuul'); pm.expect(text).to.include('DB-Erdeneuul'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 Delete signature (logical)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/signatures/{{signatureId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Logical delete succeeded', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 Full JSON no longer contains deleted",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/signatures"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Deleted record absent from full export', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().some(x=>x.id===pm.collectionVariables.get('signatureId'))).to.be.false; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 Increment includes DELETED",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/signatures/increment?since=2000-01-01T00:00:00Z"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Deleted record is in increment', () => { pm.response.to.have.status(200); const x=pm.response.json().find(x=>x.id===pm.collectionVariables.get('signatureId')); pm.expect(x).to.be.an('object'); pm.expect(x.status).to.eql('DELETED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 Binary increment",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/binary/signatures/increment?since=2000-01-01T00:00:00Z"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Binary increment is multipart', () => { pm.response.to.have.status(200); pm.expect(pm.response.headers.get('Content-Type')).to.include('multipart/mixed'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 - MinIO",
+      "item": [
+        {
+          "name": "01 Upload sample file",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "demo/sample.txt"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/admin/signatures/files/upload"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('File uploaded and signature created', () => pm.response.to.have.status(200));",
+                  "const j=pm.response.json(); pm.collectionVariables.set('fileSignatureId',j.signature.id); pm.collectionVariables.set('objectName',j.objectName);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Get pre-signed URL",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminAccessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/signatures/files/presigned-urls",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": [\n    \"{{fileSignatureId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Pre-signed URL returned', () => { pm.response.to.have.status(200); const j=pm.response.json(); const url=j[pm.collectionVariables.get('fileSignatureId')]; pm.expect(url).to.be.a('string').and.not.empty; pm.collectionVariables.set('presignedUrl',url); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 Anonymous bucket access -> 403",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "http://localhost:9000/av-signature/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Bucket is private', () => pm.expect([401,403]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 Open pre-signed URL",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{presignedUrl}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Object downloads through pre-signed URL', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://localhost:8443"
+    },
+    {
+      "key": "adminAccessToken",
+      "value": ""
+    },
+    {
+      "key": "adminRefreshToken",
+      "value": ""
+    },
+    {
+      "key": "usedRefreshToken",
+      "value": ""
+    },
+    {
+      "key": "userAccessToken",
+      "value": ""
+    },
+    {
+      "key": "licenseTypeId",
+      "value": ""
+    },
+    {
+      "key": "productId",
+      "value": ""
+    },
+    {
+      "key": "licenseId",
+      "value": ""
+    },
+    {
+      "key": "licenseCode",
+      "value": ""
+    },
+    {
+      "key": "signatureId",
+      "value": ""
+    },
+    {
+      "key": "fileSignatureId",
+      "value": ""
+    },
+    {
+      "key": "presignedUrl",
+      "value": ""
+    },
+    {
+      "key": "ownerId",
+      "value": "11111111-1111-1111-1111-111111111111"
+    },
+    {
+      "key": "deviceId",
+      "value": "22222222-2222-2222-2222-222222222222"
+    }
+  ]
+}

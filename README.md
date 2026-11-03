@@ -16,6 +16,8 @@ mvn spring-boot:run
 
 На Windows переменные из `.env` можно загрузить в IDE или задать в PowerShell перед запуском. Сервер работает по HTTPS на `https://localhost:8443`.
 
+Для защиты на Windows подготовлена пошаговая инструкция `DEFENSE-CLICK-GUIDE-RU.md`, готовая коллекция Postman `demo/ZIiVPO-2025.postman_collection.json` и резервная автоматическая проверка `scripts/run-defense-demo.ps1`.
+
 ## Что показывать по критериям
 
 ### Задание 1 Репозиторий и базовая безопасность

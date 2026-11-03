@@ -1,0 +1,1 @@
+This harmless text file is used to demonstrate upload to the private MinIO bucket.

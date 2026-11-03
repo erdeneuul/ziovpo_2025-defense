@@ -21,4 +21,5 @@ HELP.md
 *.p12
 *.jks
 *.b64
+*.cer
 .env
