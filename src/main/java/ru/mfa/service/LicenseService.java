@@ -16,6 +16,7 @@ import java.util.UUID;
 public class LicenseService {
 
     private final LicenseRepository licenseRepository;
+    private final ProductRepository productRepository;
     private final LicenseTypeRepository licenseTypeRepository;
     private final DeviceRepository deviceRepository;
     private final DeviceLicenseRepository deviceLicenseRepository;
@@ -23,12 +24,14 @@ public class LicenseService {
     private final DigitalSignatureService digitalSignatureService;
 
     public LicenseService(LicenseRepository licenseRepository,
+                          ProductRepository productRepository,
                           LicenseTypeRepository licenseTypeRepository,
                           DeviceRepository deviceRepository,
                           DeviceLicenseRepository deviceLicenseRepository,
                           LicenseHistoryRepository licenseHistoryRepository,
                           DigitalSignatureService digitalSignatureService) {
         this.licenseRepository = licenseRepository;
+        this.productRepository = productRepository;
         this.licenseTypeRepository = licenseTypeRepository;
         this.deviceRepository = deviceRepository;
         this.deviceLicenseRepository = deviceLicenseRepository;
@@ -39,6 +42,14 @@ public class LicenseService {
     @Transactional
     public License createLicense(UUID productId, UUID typeId, UUID ownerId,
                                  int deviceCount, String description) {
+        if (deviceCount < 1) {
+            throw new IllegalArgumentException("deviceCount must be at least 1");
+        }
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+        if (Boolean.TRUE.equals(product.getIsBlocked())) {
+            throw new RuntimeException("Product is blocked");
+        }
         LicenseType type = licenseTypeRepository.findById(typeId)
                 .orElseThrow(() -> new RuntimeException("License type not found"));
 
@@ -73,18 +84,19 @@ public class LicenseService {
             throw new RuntimeException("License expired");
         }
 
-        long activatedDevices = deviceLicenseRepository.countByLicenseId(license.getId());
-        if (activatedDevices >= license.getDeviceCount()) {
-            throw new RuntimeException("Device limit exceeded");
-        }
-
         boolean deviceLicenseExists = deviceLicenseRepository
                 .findByLicenseIdAndDeviceId(license.getId(), deviceId)
                 .isPresent();
 
         if (!deviceLicenseExists) {
+            long activatedDevices = deviceLicenseRepository.countByLicenseId(license.getId());
+            if (activatedDevices >= license.getDeviceCount()) {
+                throw new RuntimeException("Device limit exceeded");
+            }
+
             if (!deviceRepository.existsById(deviceId)) {
                 Device device = new Device();
+                device.setId(deviceId);
                 device.setUserId(userId);
                 device.setName(deviceName);
                 device.setMacAddress(macAddress);
@@ -100,6 +112,7 @@ public class LicenseService {
 
         if (license.getFirstActivationDate() == null) {
             license.setFirstActivationDate(LocalDate.now());
+            license.setUserId(userId);
             licenseRepository.save(license);
         }
 
@@ -133,7 +146,10 @@ public class LicenseService {
         LicenseType type = licenseTypeRepository.findById(license.getTypeId())
                 .orElseThrow(() -> new RuntimeException("License type not found"));
 
-        license.setEndingDate(license.getEndingDate().plusDays(type.getDefaultDurationInDays()));
+        LocalDate renewalBase = license.getEndingDate().isAfter(LocalDate.now())
+                ? license.getEndingDate()
+                : LocalDate.now();
+        license.setEndingDate(renewalBase.plusDays(type.getDefaultDurationInDays()));
         License saved = licenseRepository.save(license);
 
         saveHistory(licenseId, userId, "RENEWED");
@@ -160,16 +176,14 @@ public class LicenseService {
                 license.getBlocked()
         );
 
-        String signature;
         try {
-            signature = digitalSignatureService.sign(ticket);
+            String signature = digitalSignatureService.sign(ticket);
+            TicketResponse response = new TicketResponse();
+            response.setTicket(ticket);
+            response.setDigitalSignature(signature);
+            return response;
         } catch (Exception e) {
-            signature = "SIGN_ERROR";
+            throw new IllegalStateException("Ticket signing failed", e);
         }
-
-        TicketResponse response = new TicketResponse();
-        response.setTicket(ticket);
-        response.setDigitalSignature(signature);
-        return response;
     }
 }

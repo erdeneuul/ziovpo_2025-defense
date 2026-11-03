@@ -1,6 +1,7 @@
 package ru.mfa.controller;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import ru.mfa.model.LicenseType;
 import ru.mfa.repository.LicenseTypeRepository;
@@ -31,11 +32,13 @@ public class LicenseTypeController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<LicenseType> create(@RequestBody LicenseType licenseType) {
         return ResponseEntity.ok(licenseTypeRepository.save(licenseType));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<LicenseType> update(@PathVariable UUID id, @RequestBody LicenseType updated) {
         return licenseTypeRepository.findById(id)
                 .map(lt -> {
@@ -48,6 +51,7 @@ public class LicenseTypeController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         if (!licenseTypeRepository.existsById(id)) {
             return ResponseEntity.notFound().build();

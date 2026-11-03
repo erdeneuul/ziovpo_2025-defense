@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
+  test-and-build:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,26 +21,53 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Restore keystore from GitHub Secret
-        run: |
-          echo "${{ secrets.KEYSTORE_B64 }}" | base64 -d > src/main/resources/keystore.p12
-
-      - name: Build JAR
-        run: mvn clean package -DskipTests
+      - name: Restore signature material from GitHub Secrets
         env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          SIGNATURE_PUBLIC_CERT_B64: ${{ secrets.SIGNATURE_PUBLIC_CERT_B64 }}
+        run: |
+          test -n "$KEYSTORE_B64"
+          test -n "$SIGNATURE_PUBLIC_CERT_B64"
+          echo "$KEYSTORE_B64" | base64 -d > src/main/resources/keystore.p12
+          echo "$SIGNATURE_PUBLIC_CERT_B64" | base64 -d > src/main/resources/signature-public.cer
+          test -s src/main/resources/keystore.p12
+          test -s src/main/resources/signature-public.cer
+
+      - name: Test
+        run: mvn -B test
+        env:
+          TLS_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          SIGNATURE_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          SIGNATURE_KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           DB_URL: ${{ secrets.DB_URL }}
           DB_USERNAME: ${{ secrets.DB_USERNAME }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
+          MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY }}
+
+      - name: Build JAR
+        run: mvn -B package -DskipTests
+        env:
+          TLS_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          SIGNATURE_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          SIGNATURE_KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          DB_URL: ${{ secrets.DB_URL }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
+          MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY }}
 
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
           name: ziovpo-app
-          path: target/*.jar
+          path: |
+            target/*.jar
+            src/main/resources/signature-public.cer
           retention-days: 7
 
       - name: Remove keystore
         if: always()
-        run: rm -f src/main/resources/keystore.p12
+        run: rm -f src/main/resources/keystore.p12 src/main/resources/signature-public.cer

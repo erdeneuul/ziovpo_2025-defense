@@ -29,7 +29,7 @@ public class MinioService {
                 .bucket(bucket)
                 .object(objectName)
                 .stream(new ByteArrayInputStream(data), data.length, -1)
-                .contentType(contentType)
+                .contentType(contentType == null ? "application/octet-stream" : contentType)
                 .build());
         return objectName;
     }

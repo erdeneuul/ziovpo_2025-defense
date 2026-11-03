@@ -66,7 +66,7 @@ public class AuthController {
         if (passwordError != null) {
             return ResponseEntity.badRequest().body(passwordError);
         }
-        String role = "ADMIN".equalsIgnoreCase(request.role) ? "ROLE_ADMIN" : "ROLE_USER";
+        String role = "ROLE_USER";
         AppUser user = new AppUser(
                 request.username,
                 passwordEncoder.encode(request.password),
@@ -74,6 +74,26 @@ public class AuthController {
         );
         userRepository.save(user);
         return ResponseEntity.ok("Зарегистрирован: " + request.username + " роль: " + role);
+    }
+
+    @PostMapping("/admin/register")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<String> registerAdmin(@RequestBody RegisterRequest request) {
+        if (userRepository.existsByUsername(request.username)) {
+            return ResponseEntity.badRequest()
+                    .body("Пользователь уже существует: " + request.username);
+        }
+        String passwordError = validatePassword(request.password);
+        if (passwordError != null) {
+            return ResponseEntity.badRequest().body(passwordError);
+        }
+        AppUser user = new AppUser(
+                request.username,
+                passwordEncoder.encode(request.password),
+                "ROLE_ADMIN"
+        );
+        userRepository.save(user);
+        return ResponseEntity.ok("Администратор зарегистрирован: " + request.username);
     }
 
     // GET /auth/me — requires valid access token

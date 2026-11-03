@@ -8,7 +8,6 @@ import java.util.UUID;
 public class Device {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(nullable = false, updatable = false)
     private UUID id;
 
@@ -24,6 +23,7 @@ public class Device {
     public Device() {}
 
     public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }

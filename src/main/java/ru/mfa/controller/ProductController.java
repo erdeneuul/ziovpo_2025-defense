@@ -1,6 +1,7 @@
 package ru.mfa.controller;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import ru.mfa.model.Product;
 import ru.mfa.repository.ProductRepository;
@@ -31,11 +32,13 @@ public class ProductController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Product> create(@RequestBody Product product) {
         return ResponseEntity.ok(productRepository.save(product));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Product> update(@PathVariable UUID id, @RequestBody Product updated) {
         return productRepository.findById(id)
                 .map(product -> {
@@ -47,6 +50,7 @@ public class ProductController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         if (!productRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
